@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG Stats</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #000;  /* Black background */
+            color: #fff;  /* White text */
+        }
+        h1 { 
+            color: #6a0dad;  /* Dark Purple */
+        }
+        button { 
+            background-color: #ffdd00;  /* Yellow */
+            color: #6a0dad;  /* Dark Purple */
+            border: none; 
+            padding: 10px 20px; 
+            cursor: pointer; 
+            border-radius: 5px; 
+        }
+        button:hover { 
+            background-color: #ffc107; /* Slightly brighter yellow on hover */
+        }
+        #stats { 
+            margin-top: 20px; 
+        }
+        .stat-block { 
+            border: 1px solid #444;  /* Darker border */
+            padding: 10px; 
+            margin-bottom: 10px; 
+            border-radius: 5px; 
+            background-color: #222;  /* Dark grey background for stat blocks */
+        }
+        .stat-block h4 { 
+            margin-top: 0; 
+            color: #ffdd00;  /* Yellow text for headings */
+        }
+        .stat-block p { 
+            margin: 5px 0; 
+        }
+        input, select { 
+            padding: 10px; 
+            border: 1px solid #555;  /* Darker borders */
+            border-radius: 5px; 
+            margin-bottom: 10px; 
+            background-color: #333;  /* Dark grey background */
+            color: #fff;  /* White text */
+        }
+        input::placeholder { 
+            color: #aaa; /* Light grey placeholder text */
+        }
+        #seasonSelect { 
+            width: auto; 
+        }
+        #playerName { 
+            width: 150px; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        th, td { 
+            padding: 8px 12px; 
+            border: 1px solid #444;  /* Darker border for table */
+            text-align: center; 
+            cursor: pointer; 
+            color: #fff;  /* White text for table cells */
+        }
+        th { 
+            background-color: #6a0dad;  /* Dark purple */
+            color: #fff;  /* White text */
+        }
+        tr:nth-child(even) { 
+            background-color: #222;  /* Alternating dark grey rows */
+        }
+        tr:nth-child(odd) { 
+            background-color: #333;  /* Slightly lighter dark grey rows */
+        }
+		    /* Add spacing below the first button */
+		#getStatsButton {
+			margin-bottom: 10px; /* Adds spacing below the "Get Stats" button */
+		}
+    </style>
+</head>
+<body>
+    <h1>PUBG Player Stats</h1>
+    <div>
+        <div>
+            <select id="seasonSelect"></select>
+        </div>
+        <div>
+            <input type="text" id="playerName" placeholder="Enter player name" oninput="updateButtonText()" onkeypress="handleKeyPress(event)">
+        </div>
+        <div>
+            <button id="getStatsButton" onclick="getStats()">Get Stats</button>
+        </div>
+        <div>
+            <button id="getDMTStatsButton" onclick="getDMTStats()">Get DMT Stats</button>
+        </div>
+    </div>
+    <div id="stats"></div>
+
+    <script>
+        const apiKey = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiIzMTM5YTFiMC04YTg2LTAxM2QtY2UxNy0xNjVmNmJlZjNhYmMiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzMyMjI4MjUzLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6Ii0wYWMzMjliZi1kZTU0LTRmYzUtODEwYi1jMTgwNzJiYmM5Y2YifQ.kEeqB-tLyOZdt8uHHCeoBNfKK0XpkjCl6uglUeNBH64';
+        const headers = {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/vnd.api+json'
+        };
+
+        function updateButtonText() {
+            const playerName = document.getElementById('playerName').value;
+            const button = document.getElementById('getStatsButton');
+            button.textContent = playerName ? `Get ${playerName}'s Stats` : 'Get Stats';
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                document.getElementById('getStatsButton').click();
+            }
+        }
+
+        async function loadSeasons() {
+            try {
+                console.log('Fetching seasons...');
+                const response = await fetch('https://api.pubg.com/shards/steam/seasons', { headers });
+                if (!response.ok) throw new Error('Network response was not ok');
+                const data = await response.json();
+
+                const seasonSelect = document.getElementById('seasonSelect');
+                let currentSeasonId = null;
+
+                data.data.forEach(season => {
+                    if (season.attributes.isCurrentSeason) {
+                        currentSeasonId = season.id; 
+                    }
+                });
+
+                data.data.forEach(season => {
+                    const seasonNumber = parseInt(season.id.split('-').pop());
+                    if (season.id.includes('pc')) { 
+                        const option = document.createElement('option');
+                        option.value = season.id;
+                        option.textContent = season.id === currentSeasonId ? `${seasonNumber} (Current)` : seasonNumber;
+                        seasonSelect.appendChild(option);
+                    }
+                });
+
+                if (seasonSelect.options.length === 0) {
+                    const option = document.createElement('option');
+                    option.textContent = 'No seasons available';
+                    seasonSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                document.getElementById('stats').innerHTML = 'Error fetching seasons. Please try again.';
+            }
+        }
+
+        async function getStats() {
+            const playerName = document.getElementById('playerName').value;
+            const seasonId = document.getElementById('seasonSelect').value;
+
+            if (!playerName || !seasonId) {
+                document.getElementById('stats').innerHTML = 'Please enter a player name and select a season.';
+                return;
+            }
+
+            const playerId = await getPlayerId(playerName);
+
+            if (!playerId) {
+                document.getElementById('stats').innerHTML = 'Player not found.';
+                return;
+            }
+
+            const seasonUrl = `https://api.pubg.com/shards/steam/players/${playerId}/seasons/${seasonId}`;
+            const seasonResponse = await fetch(seasonUrl, { headers });
+
+            if (!seasonResponse.ok) {
+                console.error('Error fetching stats for player:', playerId);
+                document.getElementById('stats').innerHTML = 'Error fetching stats.';
+                return;
+            }
+
+            const seasonData = await seasonResponse.json();
+            const stats = seasonData.data.attributes.gameModeStats['squad-fpp'];
+
+            if (!stats || (stats.wins === 0 && stats.kills === 0 && stats.roundsPlayed === 0)) {
+                document.getElementById('stats').innerHTML = 'No data available for this player in the selected season.';
+                return;
+            }
+
+            const winRatio = ((stats.wins / stats.roundsPlayed) * 100).toFixed(2);
+            const killRatio = (stats.kills / (stats.roundsPlayed - stats.wins)).toFixed(2);
+            const avgDamage = (stats.damageDealt / stats.roundsPlayed).toFixed(2);
+
+            const statsHTML = `
+                <div class="stat-block">
+                    <h4>${playerName}'s Stats</h4>
+                    <p><strong>Wins:</strong> ${stats.wins}</p>
+                    <p><strong>Kills:</strong> ${stats.kills}</p>
+                    <p><strong>Matches Played:</strong> ${stats.roundsPlayed}</p>
+                    <p><strong>Top 10 Finishes:</strong> ${stats.top10s}</p>
+                    <p><strong>Damage Dealt:</strong> ${stats.damageDealt.toFixed(2)}</p>
+                    <p><strong>Headshots:</strong> ${stats.headshotKills}</p>
+                    <p><strong>Assists:</strong> ${stats.assists}</p>
+                    <p><strong>Revives:</strong> ${stats.revives}</p>
+                    <p><strong>Time Survived:</strong> ${stats.timeSurvived}</p>
+                    <p><strong>Win Ratio:</strong> ${winRatio}%</p>
+                    <p><strong>Kill Ratio:</strong> ${killRatio}</p>
+                    <p><strong>Average Damage:</strong> ${avgDamage}</p>
+                </div>
+            `;
+            document.getElementById('stats').innerHTML = statsHTML;
+        }
+
+        async function getPlayerId(playerName) {
+            const url = `https://api.pubg.com/shards/steam/players?filter[playerNames]=${playerName}`;
+            const response = await fetch(url, { headers });
+
+            if (!response.ok) {
+                console.error('Error fetching player ID');
+                return null;
+            }
+
+            const data = await response.json();
+            return data.data.length > 0 ? data.data[0].id : null;
+        }
+
+        async function getDMTStats() {
+            const playerNames = ['Impereal', 'jamryani', 'eatsomecake', '1stbtln', 'TwentyOneHill'];
+            const playerIds = await getPlayerIds(playerNames);
+
+            if (playerIds.length === 0) {
+                document.getElementById('stats').innerHTML = 'No player IDs found.';
+                return;
+            }
+
+            const seasonId = document.getElementById('seasonSelect').value;
+            let tableHTML = '<table><thead><tr><th onclick="sortTable(0)">Player</th><th onclick="sortTable(1)">Wins</th><th onclick="sortTable(2)">Kills</th><th onclick="sortTable(3)">Matches Played</th><th onclick="sortTable(4)">Top 10 Finishes</th><th onclick="sortTable(5)">Damage Dealt</th><th onclick="sortTable(6)">Headshots</th><th onclick="sortTable(7)">Assists</th><th onclick="sortTable(8)">Revives</th><th onclick="sortTable(9)">Time Survived</th><th onclick="sortTable(10)">Win Ratio</th><th onclick="sortTable(11)">Kill Ratio</th><th onclick="sortTable(12)">Average Damage</th></tr></thead><tbody>';
+
+            for (const playerId of playerIds) {
+                const seasonUrl = `https://api.pubg.com/shards/steam/players/${playerId}/seasons/${seasonId}`;
+                const seasonResponse = await fetch(seasonUrl, { headers });
+
+                if (!seasonResponse.ok) {
+                    console.error('Error fetching stats for player:', playerId);
+                    continue;
+                }
+
+                const seasonData = await seasonResponse.json();
+                const stats = seasonData.data.attributes.gameModeStats['squad-fpp'];
+
+                if (!stats || (stats.wins === 0 && stats.kills === 0 && stats.roundsPlayed === 0)) continue;
+
+                const winRatio = ((stats.wins / stats.roundsPlayed) * 100).toFixed(2);
+                const killRatio = (stats.kills / (stats.roundsPlayed - stats.wins)).toFixed(2);
+                const avgDamage = (stats.damageDealt / stats.roundsPlayed).toFixed(2);
+
+                tableHTML += `
+                    <tr>
+                        <td>${playerNames.shift()}</td>
+                        <td>${stats.wins}</td>
+                        <td>${stats.kills}</td>
+                        <td>${stats.roundsPlayed}</td>
+                        <td>${stats.top10s}</td>
+                        <td>${(stats.damageDealt).toFixed(2)}</td> <!-- Limited to 2 decimals -->
+                        <td>${stats.headshotKills}</td>
+                        <td>${stats.assists}</td>
+                        <td>${stats.revives}</td>
+                        <td>${stats.timeSurvived}</td>
+                        <td>${winRatio}%</td>
+                        <td>${killRatio}</td>
+                        <td>${avgDamage}</td>
+                    </tr>
+                `;
+            }
+
+            tableHTML += '</tbody></table>';
+            document.getElementById('stats').innerHTML = tableHTML;
+			
+			// Sort the table by avgDamage (column index 12) in descending order on initial load
+			sortTable(12);
+        }
+
+        async function getPlayerIds(playerNames) {
+            const url = `https://api.pubg.com/shards/steam/players?filter[playerNames]=${playerNames.join(',')}`;
+            const response = await fetch(url, { headers });
+
+            if (!response.ok) {
+                console.error('Error fetching player IDs');
+                return [];
+            }
+
+            const data = await response.json();
+            return data.data.map(player => player.id);
+        }
+
+        let lastSortColumn = -1;
+        let lastSortOrder = -1; // -1 means descending, 1 means ascending
+
+        function sortTable(columnIndex) {
+            const table = document.querySelector('table tbody');
+            const rows = Array.from(table.rows);
+			const isNumeric = columnIndex !== 0 && columnIndex !== 10;
+
+            if (columnIndex === lastSortColumn) {
+                lastSortOrder = -lastSortOrder;
+            } else {
+                lastSortColumn = columnIndex;
+                lastSortOrder = -1; // Default to descending
+            }
+
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.cells[columnIndex].textContent;
+                const cellB = rowB.cells[columnIndex].textContent;
+				
+			    // Handle Win Ratio column specially
+				let valueA, valueB;
+
+			if (columnIndex === 10) { // Win Ratio column (index 10)
+				valueA = parseFloat(cellA.replace('%', '')) / 100;
+				valueB = parseFloat(cellB.replace('%', '')) / 100;
+			} else {
+				valueA = isNumeric ? parseFloat(cellA.replace(/[^0-9.-]+/g, "")) : cellA;
+				valueB = isNumeric ? parseFloat(cellB.replace(/[^0-9.-]+/g, "")) : cellB;
+			}
+
+                return (valueA > valueB ? 1 : valueA < valueB ? -1 : 0) * lastSortOrder;
+            });
+
+            rows.forEach(row => table.appendChild(row));
+        }
+
+        loadSeasons();
+    </script>
+</body>
+</html>
