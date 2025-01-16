@@ -124,42 +124,47 @@
             }
         }
 
-        async function loadSeasons() {
-            try {
-                console.log('Fetching seasons...');
-                const response = await fetch('https://api.pubg.com/shards/steam/seasons', { headers });
-                if (!response.ok) throw new Error('Network response was not ok');
-                const data = await response.json();
-
-                const seasonSelect = document.getElementById('seasonSelect');
-                let currentSeasonId = null;
-
-                data.data.forEach(season => {
-                    if (season.attributes.isCurrentSeason) {
-                        currentSeasonId = season.id; 
-                    }
-                });
-
-                data.data.forEach(season => {
-                    const seasonNumber = parseInt(season.id.split('-').pop());
-                    if (season.id.includes('pc')) { 
-                        const option = document.createElement('option');
-                        option.value = season.id;
-                        option.textContent = season.id === currentSeasonId ? `${seasonNumber} (Current)` : seasonNumber;
-                        seasonSelect.appendChild(option);
-                    }
-                });
-
-                if (seasonSelect.options.length === 0) {
-                    const option = document.createElement('option');
-                    option.textContent = 'No seasons available';
-                    seasonSelect.appendChild(option);
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                document.getElementById('stats').innerHTML = 'Error fetching seasons. Please try again.';
-            }
-        }
+		async function loadSeasons() {
+			try {
+				console.log('Fetching seasons...');
+				const response = await fetch('https://api.pubg.com/shards/steam/seasons', { headers });
+				if (!response.ok) throw new Error('Network response was not ok');
+				const data = await response.json();
+		
+				const seasonSelect = document.getElementById('seasonSelect');
+				let currentSeasonId = null;
+				let currentSeasonNumber = null;
+		
+				// Find the current season
+				data.data.forEach(season => {
+					if (season.attributes.isCurrentSeason) {
+						currentSeasonId = season.id;
+						currentSeasonNumber = parseInt(currentSeasonId.split('-').pop());
+					}
+				});
+		
+				// Populate the dropdown with valid seasons
+				data.data.forEach(season => {
+					const seasonNumber = parseInt(season.id.split('-').pop());
+					if (season.id.includes('pc') && seasonNumber <= currentSeasonNumber) { 
+						const option = document.createElement('option');
+						option.value = season.id;
+						option.textContent = season.id === currentSeasonId ? `${seasonNumber} (Current)` : seasonNumber;
+						seasonSelect.appendChild(option);
+					}
+				});
+		
+				// Handle no valid seasons
+				if (seasonSelect.options.length === 0) {
+					const option = document.createElement('option');
+					option.textContent = 'No seasons available';
+					seasonSelect.appendChild(option);
+				}
+			} catch (error) {
+				console.error('Fetch error:', error);
+				document.getElementById('stats').innerHTML = 'Error fetching seasons. Please try again.';
+			}
+		}
 
         async function getStats() {
             const playerName = document.getElementById('playerName').value;
